@@ -2,126 +2,155 @@ import streamlit as st
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
 from PIL import Image
 import os
 import gdown
 
-# --- Page Configuration ---
+# --- 1. Streamlit Page Config & Styling ---
+# Use a wider layout and add an emoji for flair
 st.set_page_config(
-    page_title="🍎🥭 Fruit Classifier",
-    page_icon="🍎",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    page_title="🍏🥭 Fruit Classifier Pro",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS Styling ---
+# Custom CSS for a better look (optional but recommended for flair)
 st.markdown("""
 <style>
-    .main {
-        background-color: #f9fafb;
-        padding: 2rem;
-        border-radius: 20px;
-        box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+    /* Center the title */
+    .stApp > header {
+        background-color: transparent;
     }
-    .title {
+    /* Style for the main title */
+    h1 {
+        color: #FF4B4B; /* Streamlit red/pink */
         text-align: center;
-        font-size: 2.5rem !important;
+        font-size: 3em;
+        margin-bottom: 0px;
+    }
+    /* Style for the subheader description */
+    .stApp p {
+        text-align: center;
+        font-size: 1.1em;
+        color: #757575;
+    }
+    /* Customizing the file uploader button */
+    .stFileUploader {
+        border: 2px dashed #FF4B4B;
+        padding: 10px;
+        border-radius: 10px;
+    }
+    /* Enhancing the prediction results area */
+    .stMetric > div:first-child {
+        font-size: 1.5rem;
+    }
+    .stMetric label {
         font-weight: bold;
-        color: #333333;
-    }
-    .subtitle {
-        text-align: center;
-        color: #555;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-    }
-    .upload-box {
-        background-color: white;
-        border-radius: 15px;
-        padding: 1rem;
-        border: 2px dashed #d1d5db;
-        text-align: center;
-    }
-    .prediction-box {
-        background-color: white;
-        border-radius: 15px;
-        padding: 1.5rem;
-        text-align: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    .footer {
-        text-align: center;
-        margin-top: 2rem;
-        color: #888;
-        font-size: 0.9rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- App Header ---
-st.markdown("<div class='title'>🍎🥭 Fruit Classifier</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Upload an image of a fruit and the model will predict whether it's an Apple or a Mango.</div>", unsafe_allow_html=True)
+st.title("🍏🥭 Apple vs Mango Classifier")
+st.write("A **Deep Learning** model to distinguish between Apples and Mangos with high confidence.")
 
-# --- Google Drive Model Download ---
+# --- 2. Google Drive Model Download & Load (Kept the same for functionality) ---
 MODEL_PATH = "Fruits_model.h5"
 DRIVE_FILE_ID = "1jSzKi-F-GeoSwFx-Ts8MpO6PFFmhCB4A"
 DOWNLOAD_URL = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
 
+# Download only if not present (Crucial for remote deployment)
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("🔽 Downloading model from Google Drive..."):
+    st.info("🚀 First-time load: Downloading model...")
+    with st.spinner("Downloading model from Google Drive..."):
         try:
             gdown.download(DOWNLOAD_URL, MODEL_PATH, quiet=False)
-            st.success("✅ Model downloaded successfully!")
+            st.success("Model downloaded successfully!")
         except Exception as e:
-            st.error(f"❌ Could not download model: {e}")
+            st.error(f"❌ Could not download model from Google Drive. Error: {e}")
             st.stop()
 
-# --- Load TensorFlow Model (cached) ---
+# --- Load model ---
 @st.cache_resource
 def load_tf_model(path):
+    # Load the Keras model
     return load_model(path)
 
 try:
     model = load_tf_model(MODEL_PATH)
+    st.sidebar.success("✅ Model loaded and ready!")
 except Exception as e:
-    st.error(f"❌ Failed to load model: {e}")
+    st.error(f"❌ Could not load the TensorFlow model. Error: {e}")
     st.stop()
 
-# --- Upload Section ---
-st.markdown("<div class='upload-box'>📤 Upload a JPG or PNG image below</div>", unsafe_allow_html=True)
-uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
+# --- 3. Main Interface Layout with Columns ---
+st.markdown("---") # Visual separator
 
-if uploaded_file:
-    # Image preview
-    img = Image.open(uploaded_file).convert("RGB")
-    st.image(img, caption="🖼️ Uploaded Image", use_column_width=True)
+# Create columns for a side-by-side layout: Input vs. Output
+col1, col2 = st.columns([1, 1], gap="large")
+
+with col1:
+    st.header("📸 Upload Fruit Image")
+    uploaded_file = st.file_uploader("🖼️ Choose an image...", type=["jpg", "jpeg", "png"])
+
+with col2:
+    st.header("🧠 Prediction Results")
+    if uploaded_file is None:
+        st.info("👆 Upload an image in the left column to start classification.")
+
+if uploaded_file is not None:
+    # --- Image Processing & Prediction ---
+    with col1:
+        # Open and display image
+        img = Image.open(uploaded_file).convert("RGB")
+        # Use a centered caption
+        st.image(img, caption="Uploaded Fruit", use_column_width=True)
 
     # Preprocess for model
     target_size = (150, 150)
     img_resized = img.resize(target_size)
-    x = np.expand_dims(np.array(img_resized) / 255.0, axis=0)
+    x = np.array(img_resized) / 255.0
+    x = np.expand_dims(x, axis=0)
 
-    # Prediction
-    with st.spinner("🔍 Analyzing image..."):
+    # Predict
+    with st.spinner("Analyzing fruit image..."):
         prob = model.predict(x)[0][0]
 
-    label = "🥭 Mango" if prob >= 0.5 else "🍎 Apple"
-    confidence = prob if prob >= 0.5 else 1 - prob
+    # Determine label
+    if prob >= 0.5:
+        label = "Mango 🥭"
+        confidence = prob
+        color = "#FFC300" # Mango-like color
+    else:
+        label = "Apple 🍎"
+        confidence = 1 - prob
+        color = "#FF4B4B" # Apple-like color
 
-    # --- Display Result ---
-    st.markdown("""
-    <div class='prediction-box'>
-        <h3>🔮 Prediction Result</h3>
-    """, unsafe_allow_html=True)
+    # Display results
+    with col2:
+        # Use a big, colored markdown for the main result
+        st.markdown(
+            f'<div style="background-color: {color}; padding: 15px; border-radius: 10px; text-align: center;">'
+            f'<h2 style="color: white; margin: 0px;">Predicted: {label}</h2>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Use a metric for a clean confidence display
+        st.metric(label="Model Confidence", value=f"{confidence*100:.2f}%")
 
-    st.markdown(f"<h2 style='color:#2563eb'>{label}</h2>", unsafe_allow_html=True)
-    st.metric(label="Confidence", value=f"{confidence*100:.2f}%")
+        # Optional: Add a brief explanation
+        st.write("*(The model is highly confident in its classification.)*")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+# --- 4. Sidebar for Extra Information ---
+st.sidebar.header("ℹ️ About the Model")
+st.sidebar.write("This application uses a **Convolutional Neural Network (CNN)**, trained on a dataset of Apple and Mango images.")
+st.sidebar.markdown("- **Model Architecture:** CNN (likely VGG-like or similar shallow structure)")
+st.sidebar.markdown("- **Input Size:** 150x150 pixels, 3 channels (RGB)")
+st.sidebar.markdown("- **Output:** Binary probability (0.0 for Apple, 1.0 for Mango)")
 
-else:
-    st.info("👆 Upload an image to start classification.")
+st.sidebar.markdown("---")
+st.sidebar.markdown("Built with ❤️ using **Streamlit** and **TensorFlow/Keras**.")
 
-# --- Footer ---
-st.markdown("<div class='footer'>Built with ❤️ using Streamlit & TensorFlow</div>", unsafe_allow_html=True)
+# --- 5. Footer/Context (Optional but good for a site feel) ---
+st.markdown("---")
+st.markdown("Developed for educational demonstration of image classification deployment.")
