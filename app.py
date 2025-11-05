@@ -1,81 +1,127 @@
 import streamlit as st
 import numpy as np
-import tensorflow as tf # Added the standard TensorFlow import
+import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 from PIL import Image
 import os
 import gdown
 
-# --- Streamlit Page Config ---
-st.set_page_config(page_title="Fruit Classifier", layout="centered")
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="🍎🥭 Fruit Classifier",
+    page_icon="🍎",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-st.title("🍎🥭 Apple vs Mango Classifier")
-st.write("Upload an image of a fruit and the model will predict whether it's an **Apple** or a **Mango**.")
+# --- Custom CSS Styling ---
+st.markdown("""
+<style>
+    .main {
+        background-color: #f9fafb;
+        padding: 2rem;
+        border-radius: 20px;
+        box-shadow: 0px 4px 15px rgba(0,0,0,0.1);
+    }
+    .title {
+        text-align: center;
+        font-size: 2.5rem !important;
+        font-weight: bold;
+        color: #333333;
+    }
+    .subtitle {
+        text-align: center;
+        color: #555;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+    .upload-box {
+        background-color: white;
+        border-radius: 15px;
+        padding: 1rem;
+        border: 2px dashed #d1d5db;
+        text-align: center;
+    }
+    .prediction-box {
+        background-color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .footer {
+        text-align: center;
+        margin-top: 2rem;
+        color: #888;
+        font-size: 0.9rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# --- Google Drive model download ---
+# --- App Header ---
+st.markdown("<div class='title'>🍎🥭 Fruit Classifier</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Upload an image of a fruit and the model will predict whether it's an Apple or a Mango.</div>", unsafe_allow_html=True)
+
+# --- Google Drive Model Download ---
 MODEL_PATH = "Fruits_model.h5"
 DRIVE_FILE_ID = "1jSzKi-F-GeoSwFx-Ts8MpO6PFFmhCB4A"
 DOWNLOAD_URL = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
 
-# Download only if not present (Crucial for remote deployment)
 if not os.path.exists(MODEL_PATH):
-    with st.spinner("Downloading model from Google Drive..."):
-        # gdown will download the file and name it MODEL_PATH
+    with st.spinner("🔽 Downloading model from Google Drive..."):
         try:
             gdown.download(DOWNLOAD_URL, MODEL_PATH, quiet=False)
-            st.success("Model downloaded successfully!")
+            st.success("✅ Model downloaded successfully!")
         except Exception as e:
-            st.error(f"❌ Could not download model from Google Drive. Please check the DRIVE_FILE_ID. Error: {e}")
+            st.error(f"❌ Could not download model: {e}")
             st.stop()
 
-# --- Load model ---
-# Use st.cache_resource to load the heavy model only once
+# --- Load TensorFlow Model (cached) ---
 @st.cache_resource
 def load_tf_model(path):
-    # This function loads the Keras model
-    model = load_model(path)
-    return model
+    return load_model(path)
 
 try:
     model = load_tf_model(MODEL_PATH)
-    st.sidebar.success("Model loaded and ready for prediction!")
 except Exception as e:
-    st.error(f"❌ Could not load the TensorFlow model. Check dependencies and file integrity. Error: {e}")
+    st.error(f"❌ Failed to load model: {e}")
     st.stop()
 
-# --- Upload image ---
-uploaded_file = st.file_uploader("📤 Upload an image...", type=["jpg", "jpeg", "png"])
+# --- Upload Section ---
+st.markdown("<div class='upload-box'>📤 Upload a JPG or PNG image below</div>", unsafe_allow_html=True)
+uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
 
-if uploaded_file is not None:
-    # Open and display image
+if uploaded_file:
+    # Image preview
     img = Image.open(uploaded_file).convert("RGB")
-    st.image(img, caption="Uploaded Image", use_column_width=True)
+    st.image(img, caption="🖼️ Uploaded Image", use_column_width=True)
 
     # Preprocess for model
     target_size = (150, 150)
     img_resized = img.resize(target_size)
-    # Convert image to numpy array, normalize, and expand dimensions for model input
-    x = np.array(img_resized) / 255.0
-    x = np.expand_dims(x, axis=0)
+    x = np.expand_dims(np.array(img_resized) / 255.0, axis=0)
 
-    # Predict
-    with st.spinner("Predicting..."):
-        # The model is trained for binary classification, resulting in a probability score
+    # Prediction
+    with st.spinner("🔍 Analyzing image..."):
         prob = model.predict(x)[0][0]
 
-    # Determine label based on probability threshold (0.5)
-    if prob >= 0.5:
-        label = "Mango 🥭"
-        confidence = prob
-    else:
-        label = "Apple 🍎"
-        confidence = 1 - prob
+    label = "🥭 Mango" if prob >= 0.5 else "🍎 Apple"
+    confidence = prob if prob >= 0.5 else 1 - prob
 
-    # Display results
-    st.markdown("---")
-    st.subheader(f"Prediction: **{label}**")
+    # --- Display Result ---
+    st.markdown("""
+    <div class='prediction-box'>
+        <h3>🔮 Prediction Result</h3>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"<h2 style='color:#2563eb'>{label}</h2>", unsafe_allow_html=True)
     st.metric(label="Confidence", value=f"{confidence*100:.2f}%")
-    st.markdown("---")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
 else:
-    st.info("👆 Upload an image of an apple or a mango to start classification.")
+    st.info("👆 Upload an image to start classification.")
+
+# --- Footer ---
+st.markdown("<div class='footer'>Built with ❤️ using Streamlit & TensorFlow</div>", unsafe_allow_html=True)
