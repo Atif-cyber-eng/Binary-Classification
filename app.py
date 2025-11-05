@@ -19,7 +19,7 @@ st.markdown("""
 <style>
     /* Center the title */
     .stApp > header {
-        background-color: transparent;
+        background-color: white;
     }
     /* Style for the main title */
     h1 {
